@@ -92,6 +92,7 @@ Allowed options per language:
 - `fixed_link` (default: `None`): if specified, when switching to this language, you will be redirected to this link
 - `build` (default: `true`): a boolean used to control the build of a `/<language>` path for the given language
 - `site_name` (default: `mkdocs.yml site_name`): the [`site_name` translation for the given language](#translating-site-name)
+- `homepage` (default: `None`) - only relevant for the material template: if specified, the [URL of the homepage logo](#localizing-the-homepage-logo-link) will be set to this URL, e.g., for linking to other localized homepages
 
 Feature rich `languages` options usage:
 
@@ -103,9 +104,13 @@ plugins:
         en:
           name: English
           build: true
+          site_name: My site
+          homepage: https://sample.com/en
         fr:
           name: Français
           build: true
+          site_name: Mes pages
+          homepage: https://sample.com/fr
 ```
 
 Short (legacy) `languages` options usage:
@@ -135,11 +140,16 @@ material_alternate: true
 
 This option is a nested mapping of **language**: **default title**: **translated title** that allows you to [translate the navigation sections of your website](#translating-navigation).
 
+If you include external links in your navigation, using the [mkdocs nav configuration](https://www.mkdocs.org/user-guide/writing-your-docs/#configure-pages-and-navigation), you can assign different external links per language.
+
 ```yaml
 nav_translations:
   fr:
     Topic1: Sujet1
     Topic2: Sujet2
+    British Embassy Paris:
+      translation: L'ambassade du Royaume-Uni à Paris
+      url: https://www.gov.uk/world/organisations/british-embassy-paris.fr
 ```
 
 ### search_reconfigure
@@ -344,6 +354,44 @@ plugins:
           site_name: Titre du site en Français pour les pages en /fr/
 ```
 
+## Localizing the homepage logo link
+
+If you use the [material](https://squidfunk.github.io/mkdocs-material/)
+template, you can localize your homepage logo link.
+
+Using the `homepage` option for a given language, will localize the link
+your homepage logo is pointing to. A possible use case for this is that you
+need the logo to link to external sites, which themselves are localized, and
+you want to make sure that the user is presented the external homepage in the
+same language as chosen for the current homepage.
+
+If you use the material template, you have the possibility to set a different
+URL for the homepage logo, using the `extra: homepage: ...` option. If this
+option is set in your configuration, the default version of your site will use
+the URL specified here, while the `./<language>` versions of your site will use
+the URL specified in the `i18n` configuration.
+
+```yaml
+extra:
+  homepage: https://sample.com
+
+plugins:
+  - i18n:
+      default_language: en
+      languages:
+        en:
+          name: English
+          site_name: Site title in English for pages with path /en/
+          homepage: https://sample.com/en
+        fr:
+          name: Français
+          site_name: Titre du site en Français pour les pages en /fr/
+          homepage: https://sample.com/fr
+```
+
+If the `extra: homepage: ...` option is not used, then the URL of the
+`default_language` will be applied.
+
 ## Translating navigation
 
 Using the `nav_translations` configuration option, you can translate all your
@@ -353,10 +401,23 @@ navigation titles easily.
 translation once and it will be used to translate all the sections, links and
 pages which share the same title.
 
+If you use **external links** in your navigation, you can assign different
+(localized) external links per language. Please notice, that this only applies
+to external links. Pre-requisite is that you use the
+[mkdocs nav configuration](https://www.mkdocs.org/user-guide/writing-your-docs/#configure-pages-and-navigation) to define your navigation, otherwise no localized link will be assigned.
+
 This example will translate **any** navigation item title from **Topic1** to
 **Sujet1** on the French version of the documentation:
 
 ```yaml
+nav:
+  - index.md
+  - Topic1:
+    - topic1/named_file.md
+  - Topic2:
+    - topic2/README.md
+  - British Embassy Paris: https://www.gov.uk/world/organisations/british-embassy-paris
+
 plugins:
   - i18n:
       default_language: en
@@ -369,6 +430,9 @@ plugins:
         fr:
           Topic1: Sujet1
           Topic2: Sujet2
+          British Embassy Paris:
+            translation: L'ambassade du Royaume-Uni à Paris
+            url: https://www.gov.uk/world/organisations/british-embassy-paris.fr
 ```
 
 ## Localized content can diverge from the default version

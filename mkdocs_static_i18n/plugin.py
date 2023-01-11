@@ -123,10 +123,13 @@ class I18n(BasePlugin):
         """
         Configure languages options for the 'default' language
         """
-        # Set the 'site_name' for all configured languages
+        # Set the 'site_name' and 'homepage' for all configured languages
         for language, lang_config in self.config["languages"].items():
             localized_site_name = lang_config["site_name"] or config["site_name"]
             self.config["languages"][language]["site_name"] = localized_site_name
+            localized_homepage = lang_config["homepage"]
+            if localized_homepage:
+                self.config["languages"][language]["homepage"] = localized_homepage
         # the default_language options can be made available for the
         # 'default' / version of the website
         self.default_language_options = self.config["languages"].pop(
@@ -137,6 +140,7 @@ class I18n(BasePlugin):
                 "fixed_link": None,
                 "build": True,
                 "site_name": config["site_name"],
+                "homepage": None,
             },
         )
         if self.default_language_options["name"] == "default":
@@ -149,6 +153,17 @@ class I18n(BasePlugin):
             self.default_language_options["site_name"] = default_language_config.get(
                 "site_name", config["site_name"]
             )
+            # Check if default homepage is set as extra in configuration
+            # (only relevant for the material template)
+            if "extra" in config.keys():
+                default_homepage = config.get("extra").get("homepage", None)
+            else:
+                default_homepage = None
+            # Set the localized homepage if not None
+            if default_homepage:
+                self.default_language_options["homepage"] = default_language_config.get(
+                    "homepage", default_homepage
+                )
             self.default_language_options["fixed_link"] = default_language_config.get(
                 "fixed_link", None
             )
@@ -168,6 +183,28 @@ class I18n(BasePlugin):
                 "build": build,
                 "site_name": config["site_name"],
             }
+            # Append the localized homepage if configured
+            if "homepage" in config.keys() and config["homepage"]:
+                self.config["languages"][self.default_language].update({"homepage": config["homepage"]})
+
+    def _set_localized_homepages(self, config):
+        """
+        Set the localized homepage
+        """
+        # Set localized homepage for each listed language if configured
+        for language in self.all_languages:
+            if "homepage" in self.config["languages"][language].keys() and self.config["languages"][language]["homepage"]:
+                homepage = {"homepage": self.config["languages"][language]["homepage"]}
+                self.i18n_configs[language].update({"extra": homepage})
+        # ... and then in the config file for the default language,
+        # if it is not set by the user
+        if "homepage" in self.config["languages"][self.default_language].keys() and self.config["languages"][self.default_language]["homepage"]:
+            homepage_url = self.config["languages"][self.default_language]["homepage"]
+            if "extra" in config:
+                config["extra"].setdefault("homepage", homepage_url)
+            else:
+                homepage = {"homepage": homepage_url}
+                config.update({"extra": homepage})
 
     def on_config(self, config, **kwargs):
         """
@@ -247,6 +284,8 @@ class I18n(BasePlugin):
         config["plugins"] = plugins
         if hooks:
             config["hooks"] = hooks
+        # Set the localized homepage
+        self._set_localized_homepages(config)
         # Set theme locale to default language
         if self.default_language != "en":
             if config["theme"].name in MKDOCS_THEMES:
@@ -394,13 +433,30 @@ class I18n(BasePlugin):
         if translated_nav:
             for item in items:
                 if hasattr(item, "title") and item.title in translated_nav:
-                    log.debug(
-                        f"Translating {type(item).__name__} title '{item.title}' "
-                        f"({self.default_language}) to "
-                        f"'{translated_nav[item.title]}' ({language})"
-                    )
-                    item.title = translated_nav[item.title]
-                    translated = True
+                    # We need to check if translated_nav.title only has a string value (the translation) or children (translation and optionally url)
+                    trans_item = translated_nav[item.title]
+                    translation = ""
+                    if type(trans_item) is str:
+                        translation = translated_nav[item.title]
+                    elif type(translated_nav[item.title]) is dict and "translation" in translated_nav[item.title]:
+                        translation = translated_nav[item.title]["translation"]
+                    if translation:
+                        log.debug(
+                            f"Translating {type(item).__name__} title '{item.title}' "
+                            f"({self.default_language}) to "
+                            f"'{translation}' ({language})"
+                        )
+                        item.title = translation
+                        translated = True
+
+                    # Check if this is a link and a if a url is provided in translated_nav
+                    if item.is_link and type(trans_item) is dict and "url" in trans_item:
+                        log.debug(
+                            f"Replacing {type(item).__name__} url '{item.url}' "
+                            f"({self.default_language}) with "
+                            f"'{translation}' ({trans_item['url']})"
+                        )
+                        item.url = trans_item["url"]
                 if hasattr(item, "children") and item.children:
                     translated = (
                         self._maybe_translate_titles(language, item.children)
